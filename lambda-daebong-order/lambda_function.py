@@ -37,8 +37,14 @@ def lambda_handler(event, context):
     creds = oauth()
     service = build('sheets', 'v4', credentials=creds)
     spreadsheet_id = event["spreadsheet_id"]
-    insert_name = event["insert_name"]
+    print(spreadsheet_id)
+    
+    insert_name = event.get("insert_name", event.get("sheet_title", ""))
+    
+    
     phone_number = event["phone_number"]
+
+    print(insert_name)
     sheet_order_id = aws_get_sheet_id_by_name(service, spreadsheet_id, "발주서")
 
     try: 
@@ -200,6 +206,7 @@ def aws_get_sheet_id_by_name(service, spreadsheet_id, sheet_name):
 if __name__ == "__main__":
        lambda_handler({
         "spreadsheet_id": "1RAnWFmNvlv2VUk_biNbpUyhasr6o2Gt5HXZEk216sDs",
-        "insert_name": "338_백민",
-        "phone_number":"01052371951"
+        "insert_name":"338_백민기",
+        "phone_number":"01052371951",
+        "sheet_title":"12340"
     }, {})
