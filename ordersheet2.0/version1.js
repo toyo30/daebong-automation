@@ -95,19 +95,66 @@ function importFilteredData() {
           return row[4] == "발주완료"; // E열은 인덱스 4
         });
 
+        //발주 단건의 값을 바꿈. 발주 단건은 발주서 번호와 코드를 가지고 있음
+        //발주 발주서 번호와 코드를 가지고,
+        //예금자 정보를 다 가져옴 {[발주서 코드] : {key: 발주서 코드, amount: 금액}}
+        const depositObjectByOrderNumber = getAllDepositObjectByOrderNumber();
+
         for (var i = 0; i < filteredData.length; i++) {
-          filteredData[i][4] = "상품준비중"; // E열을 인덱스 4로 접근하여 값 변경
-          filteredData[i][7] = "입금매칭";
+          Logger.log(
+            "depositObjectByOrderNumber" +
+              JSON.stringify(depositObjectByOrderNumber)
+          );
+
+          var keyInFilteredData = filteredData[i][27];
+          if (depositObjectByOrderNumber.hasOwnProperty(keyInFilteredData)) {
+            var totalAmount =
+              depositObjectByOrderNumber[keyInFilteredData].amount;
+            let orderNumber = parseInt(keyInFilteredData);
+            // 금액이 숫자인지 확인
+            if (isNaN(keyInFilteredData)) {
+              orderNumber = parseFloat(keyInFilteredData); // K열: 금액
+            }
+
+            if (
+              insertCheckOrderItem(filteredData[i], orderNumber, totalAmount)
+            ) {
+              filteredData[i][4] = "상품준비중"; // E열을 인덱스 4로 접근하여 값 변경
+              filteredData[i][7] = "입금확인완료";
+              var rowIndex = data.findIndex(function (originalRow) {
+                return originalRow === filteredData[i];
+              });
+              targetSheet.getRange(rowIndex + 1, 5).setValue("상품준비중"); // E열은 인덱스 4+1
+              targetSheet.getRange(rowIndex + 1, 8).setValue("입금확인완료"); // H열은 인덱스 7+1
+            } else {
+              filteredData[i][4] = "발주완료"; // E열을 인덱스 4로 접근하여 값 변경
+              filteredData[i][7] = "금액확인필요";
+
+              var rowIndex = data.findIndex(function (originalRow) {
+                return originalRow === filteredData[i];
+              });
+              targetSheet.getRange(rowIndex + 1, 5).setValue("발주완료"); // E열은 인덱스 4+1
+              targetSheet.getRange(rowIndex + 1, 8).setValue("금액확인필요"); // H열은 인덱스 7+1
+            }
+
+            if (
+              depositObjectByOrderNumber[keyInFilteredData].amount -
+                filteredData[i][17] >=
+              0
+            ) {
+              Logger.log(
+                depositObjectByOrderNumber[keyInFilteredData].amount -
+                  filteredData[i][17]
+              );
+              depositObjectByOrderNumber[keyInFilteredData].amount =
+                insertCheckedDepositor(
+                  filteredData[i][27],
+                  filteredData[i][17],
+                  totalAmount
+                );
+            }
+          }
         }
-
-        filteredData.forEach(function (row) {
-          var rowIndex = data.findIndex(function (originalRow) {
-            return originalRow === row;
-          });
-          targetSheet.getRange(rowIndex + 1, 5).setValue("상품준비중"); // E열은 인덱스 4+1
-          targetSheet.getRange(rowIndex + 1, 8).setValue("입금매칭"); // H열은 인덱스 7+1
-        });
-
         // 발주대기상품 시트에 필터링된 데이터 붙여넣기
         var sourceSpreadsheet = SpreadsheetApp.getActiveSpreadsheet();
         var sourceSheet = sourceSpreadsheet.getSheetByName("발주대기상품");
@@ -129,79 +176,12 @@ function importFilteredData() {
     });
   } catch (e) {
     Logger.log("Error: " + e.message);
+  } finally {
+    // deleteCompleteDepositor();
   }
 }
 
-function insertCheckInDepositPriceRowTest(orderNumber, totalAmount) {
-  var orderSheet =
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("금일발주내역");
-  var orderData = orderSheet.getDataRange().getValues();
-  var mappingSheet =
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("금일매핑주문");
-
-  // 첫 행은 헤더로 가정하고 두 번째 행부터 시작
-  for (var i = 1; i < orderData.length; i++) {
-    var targetNumber = orderData[i][9]; // J열: 발주서번호
-    if (
-      targetNumber === orderNumber &&
-      !orderData[i][14] &&
-      totalAmount >= orderData[i][10]
-    ) {
-      totalAmount = totalAmount - orderData[i][10];
-      var row = orderData[i];
-      var nextColumnIndex = row.length; // 다음 열 인덱스는 현재 행의 길이와 동일
-      orderSheet.getRange(i + 1, 15).setValue(true);
-      mappingSheet.appendRow(orderData[i].slice(0, 12));
-    }
-  }
-  return totalAmount;
-}
-
-function insertCheckInDepositRowOverTotalPriceTest(
-  orderNumber,
-  orderTotalAmount,
-  totalAmount
-) {
-  var orderSheet =
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("금일입금내역");
-  var targetSheet =
-    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("입금확정");
-  var orderData = orderSheet.getDataRange().getValues();
-  //지금까지 더한 입금내역, 나중에 예치금계산할 때 쓰임
-  let currentAmount = 0;
-  let preDepositedAmount = totalAmount - orderTotalAmount;
-
-  for (var i = 1; i < orderData.length; i++) {
-    var targetNumber = parseInt(orderData[i][4]); // J열: 발주서번호
-
-    if (targetNumber === orderNumber && !orderData[i][3]) {
-      let considerPredepositValue =
-        orderData[i].length > 6 && orderData[i][7]
-          ? parseInt(orderData[i][7])
-          : parseInt(orderData[i][1]);
-      if (orderTotalAmount >= considerPredepositValue) {
-        Logger.log(orderData[i]);
-        orderTotalAmount -= considerPredepositValue;
-        orderSheet.getRange(i + 1, 4).setValue(true);
-        var rowItemChangedSetTrue = orderData[i].splice(3, 1, true);
-        targetSheet.appendRow(rowItemChangedSetTrue); // E열은 인덱스 4+1
-      } else {
-        orderSheet.getRange(i + 1, 4).setValue(false);
-        if (preDepositedAmount >= considerPredepositValue) {
-          preDepositedAmount -= considerPredepositValue;
-        } else {
-          orderSheet.getRange(i + 1, 7).setValue(preDepositedAmount);
-          orderSheet
-            .getRange(i + 1, 6)
-            .setValue(`입금내역 초과 예치금 ${preDepositedAmount}`);
-          break;
-        }
-      }
-    }
-  }
-}
-
-function checkDepositActionAllTest() {
+function getAllDepositObjectByOrderNumber() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sheet = ss.getSheetByName("입금매칭대기");
   var sheetData = sheet.getDataRange().getValues();
@@ -210,21 +190,20 @@ function checkDepositActionAllTest() {
     if (index == 0) {
       return dict;
     }
-    if (!data[3] || !data[4] || !(data[4] == "")) {
+    if (!data[3] && data[4]) {
       let amountThisRow = 0;
       if (data.length > 6 && data[6]) {
         amountThisRow += data[6];
       } else {
         amountThisRow += data[1];
       }
-
       const key = data[4]; // 4번 인덱스를 키로 사용
-      if (key) {
+      if (key && !data[3]) {
         // 키가 유효한지 확인
         if (!dict[key]) {
           dict[key] = {
             key: key,
-            amount: data[1],
+            amount: amountThisRow,
           }; // 키가 없으면 빈 배열을 초기화
         } else {
           dict[key].amount += amountThisRow;
@@ -234,14 +213,68 @@ function checkDepositActionAllTest() {
     return dict;
   }, {});
 
-  for (const key in orderNumberListByDepositList) {
-    if (orderNumberListByDepositList.hasOwnProperty(key)) {
-      var totalAmount = orderNumberListByDepositList[key].amount;
-      let orderNumber = parseInt(key);
-      // 금액이 숫자인지 확인
-      if (isNaN(key)) {
-        orderNumber = parseFloat(key); // K열: 금액
+  return orderNumberListByDepositList;
+}
+
+function insertCheckOrderItem(orderData, orderNumber, totalAmount) {
+  // var orderSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('금일발주내역');
+  // var orderData = orderSheet.getDataRange().getValues();
+  // var mappingSheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('발주확정상품');
+
+  var targetNumber = orderData[27]; // AB열: 발주서번호
+  if (targetNumber === orderNumber && totalAmount >= orderData[17]) {
+    // totalAmount = totalAmount - orderData[17];
+    // var row = orderData;
+    // var nextColumnIndex = row.length; // 다음 열 인덱스는 현재 행의 길이와 동일
+    return true;
+  } else {
+    return false;
+  }
+}
+
+function deleteCompleteDepositor() {
+  var orderSheet =
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("입금매칭대기");
+  var orderData = orderSheet.getDataRange().getValues();
+  for (var i = 1; i < orderData.length; i++) {
+    if (orderData[i][3]) {
+      orderSheet.deleteRow(i + 1);
+    }
+  }
+}
+
+function insertCheckedDepositor(orderNumber, orderTotalAmount, totalAmount) {
+  var orderSheet =
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("입금매칭대기");
+  var targetSheet =
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("입금확정");
+  var orderData = orderSheet.getDataRange().getValues();
+  totalAmount -= orderTotalAmount;
+  for (var i = 1; i < orderData.length; i++) {
+    var targetNumber = parseInt(orderData[i][4]); //E열 발주서 번호
+    if (targetNumber === orderNumber && !orderData[i][3]) {
+      let considerPredepositValue =
+        orderData[i].length > 6 && orderData[i][6]
+          ? parseInt(orderData[i][6])
+          : parseInt(orderData[i][1]);
+      if (orderTotalAmount >= considerPredepositValue) {
+        orderTotalAmount -= considerPredepositValue;
+        orderSheet.getRange(i + 1, 4).setValue(true);
+        orderSheet.getRange(i + 1, 7).setValue("");
+        orderSheet.getRange(i + 1, 6).setValue("");
+        var rowItemChangedSetTrue = [...orderData[i]];
+        rowItemChangedSetTrue.splice(3, 1, true);
+        targetSheet.appendRow(rowItemChangedSetTrue);
+      } else {
+        var preDepositedAmount = considerPredepositValue - orderTotalAmount;
+        orderSheet.getRange(i + 1, 7).setValue(preDepositedAmount);
+        orderSheet
+          .getRange(i + 1, 6)
+          .setValue(`입금내역 초과 예치금 ${preDepositedAmount}`);
+        return totalAmount;
+        // }
       }
     }
   }
+  return totalAmount;
 }
