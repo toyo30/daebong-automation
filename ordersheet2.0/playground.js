@@ -109,3 +109,54 @@ c.splice(4, 1, "4");
 console.log(b);
 console.log(a);
 console.log(c);
+
+let depositObjectByOrderNumber = {
+  19: { key: 19, amount: 794800 },
+  20: { key: 20, amount: 856100 },
+  21: { key: 21, amount: 703700 },
+  48: { key: 48, amount: 21000 },
+  50: { key: 50, amount: 76400 },
+  57: { key: 57, amount: 166200 },
+  60: { key: 60, amount: 21900 },
+  98: { key: 98, amount: 249000 },
+  114: { key: 114, amount: 273700 },
+  130: { key: 130, amount: 42500 },
+  143: { key: 143, amount: 1380700 },
+  171: { key: 171, amount: 65000 },
+  180: { key: 180, amount: 38700 },
+  189: { key: 189, amount: 25200 },
+  195: { key: 195, amount: 175400 },
+  208: { key: 208, amount: 52000 },
+  209: { key: 209, amount: 32800 },
+  226: { key: 226, amount: 62000 },
+  230: { key: 230, amount: 20000 },
+  276: { key: 276, amount: 19500 },
+  330: { key: 330, amount: 71300 },
+  335: { key: 335, amount: 70200 },
+  337: { key: 337, amount: 17800 },
+  339: { key: 339, amount: 121000 },
+  343: { key: 343, amount: 111000 },
+  367: { key: 367, amount: 51400 },
+  387: { key: 387, amount: 351800 },
+  436: { key: 436, amount: 11300 },
+  438: { key: 438, amount: 106100 },
+  442: { key: 442, amount: 19600 },
+  461: { key: 461, amount: 9700 },
+  464: { key: 464, amount: 299200 },
+  475: { key: 475, amount: 44100 },
+  485: { key: 485, amount: 103800 },
+  489: { key: 489, amount: 159000 },
+  502: { key: 502, amount: 286000 },
+  504: { key: 504, amount: 88700 },
+  514: { key: 514, amount: 2133300 },
+  517: { key: 517, amount: 91700 },
+  552: { key: 552, amount: 15700 },
+  553: { key: 553, amount: 37300 },
+};
+
+console.log(Object.keys(depositObjectByOrderNumber));
+
+Object.keys(depositObjectByOrderNumber).forEach(function (keyValue) {
+  console.log(keyValue);
+  console.log(depositObjectByOrderNumber[keyValue]["key"]);
+});
