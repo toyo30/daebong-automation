@@ -100,3 +100,12 @@ console.log("------------------");
 console.log(rowIndex);
 
 console.log(data[rowIndex]);
+
+const a = [0, 1, 2, 3, 4, 5];
+
+const b = a.splice(4, 1, "4");
+const c = [...a];
+c.splice(4, 1, "4");
+console.log(b);
+console.log(a);
+console.log(c);
