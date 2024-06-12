@@ -83,8 +83,14 @@ function importFilteredData() {
     //예금자 정보를 다 가져옴 {[발주서 코드] : {key: 발주서 코드, amount: 금액}}
     const depositObjectByOrderNumber = getAllDepositObjectByOrderNumber();
 
-    sheetIds.forEach(function (sheetId) {
+    Object.keys(depositObjectByOrderNumber).forEach(function (keyValue) {
       try {
+        var sheetId =
+          sheetIds[parseInt(depositObjectByOrderNumber[keyValue]["key"]) - 1];
+        Logger.log('depositObjectByOrderNumber[keyValue]["key"]');
+        Logger.log(depositObjectByOrderNumber[keyValue]["key"]);
+        Logger.log("sheetIds");
+        Logger.log(sheetIds);
         var targetSpreadsheet = SpreadsheetApp.openById(sheetId);
         var targetSheet = targetSpreadsheet.getSheetByName("누적발주");
         if (!targetSheet) {
@@ -95,6 +101,9 @@ function importFilteredData() {
         }
 
         var data = targetSheet.getDataRange().getValues();
+
+        Logger.log("data");
+        Logger.log(data);
         // E열이 "발주완료"인 행만 필터링
         var filteredData = data.filter(function (row) {
           return row[4] == "발주완료"; // E열은 인덱스 4
