@@ -152,11 +152,17 @@ let depositObjectByOrderNumber = {
   517: { key: 517, amount: 91700 },
   552: { key: 552, amount: 15700 },
   553: { key: 553, amount: 37300 },
+  2: { key: 1, amount: 37300 },
 };
 
-console.log(Object.keys(depositObjectByOrderNumber));
+if (depositObjectByOrderNumber.hasOwnProperty(1)) {
+  console.log("--");
+} else {
+  console.log("222");
+}
+// console.log(Object.keys(depositObjectByOrderNumber));
 
-Object.keys(depositObjectByOrderNumber).forEach(function (keyValue) {
-  console.log(keyValue);
-  console.log(depositObjectByOrderNumber[keyValue]["key"]);
-});
+// Object.keys(depositObjectByOrderNumber).forEach(function (keyValue) {
+//   console.log(keyValue);
+//   console.log(depositObjectByOrderNumber[keyValue]["key"]);
+// });
