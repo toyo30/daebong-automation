@@ -71,20 +71,51 @@ function fetchCarrierId(searchText) {
   return null;
 }
 
-function trackPackage() {
+function batchTrackPackage() {
   var sheet =
     SpreadsheetApp.getActiveSpreadsheet().getSheetByName("발주확정상품");
   var lastRow = sheet.getLastRow();
   var data = sheet.getDataRange().getValues();
+  var rowsToMove = [...data];
+  Logger.log("data");
+  Logger.log(data);
+  var batchSize = 100; // 한 번에 처리할 행 수
+  // 배치 프로세스 초기화
+  PropertiesService.getScriptProperties().setProperty(
+    "rowsToMove",
+    JSON.stringify(rowsToMove)
+  );
+  PropertiesService.getScriptProperties().setProperty("currentBatch", 0);
+  PropertiesService.getScriptProperties().setProperty("lastRow", lastRow);
+  trackPackage();
+}
 
-  for (var i = 1; i <= lastRow - 1; i++) {
+function trackPackage() {
+  var data = JSON.parse(
+    PropertiesService.getScriptProperties().getProperty("rowsToMove")
+  );
+  var currentBatch = parseInt(
+    PropertiesService.getScriptProperties().getProperty("currentBatch")
+  );
+  var lastRow = parseInt(
+    PropertiesService.getScriptProperties().getProperty("lastRow")
+  );
+  var batchSize = 100;
+  var start = currentBatch * batchSize;
+  var end = Math.min(start + batchSize, lastRow);
+  var sheet =
+    SpreadsheetApp.getActiveSpreadsheet().getSheetByName("발주확정상품");
+
+  for (var i = start; i < end; i++) {
     var trackingNumber = data[i][3];
     var statusCode = data[i][4];
 
     // D열의 값이 "DELIVERED"인 경우 건너뛰기
-    if (statusCode === "배송완료" || !trackingNumber || trackingNumber === "") {
+    if (!trackingNumber || trackingNumber === "") {
       continue;
     }
+    Logger.log("data[i]");
+    Logger.log(data[i]);
 
     try {
       var carrierName = data[i][2];
@@ -120,25 +151,30 @@ function trackPackage() {
         var json = JSON.parse(response.getContentText());
 
         Logger.log(json);
-
-        var lastEvent = json.data.track.lastEvent;
-        var statusDescription = "No data available";
-        statusCode = "No code available";
-        if (lastEvent) {
+        var lastEvent = null;
+        var statusDescription = "미출고";
+        var statusCode = "No code available";
+        if (json.hasOwnProperty("errors")) {
+          Logger.log("미출고");
+          sheet.getRange(i + 1, 5).setValue(statusDescription);
+        } else if (
+          json.hasOwnProperty("data") &&
+          json.data.hasOwnProperty("track") &&
+          json.data.track.hasOwnProperty("lastEvent")
+        ) {
+          lastEvent = json.data.track.lastEvent;
           statusDescription = lastEvent.status.name;
           statusCode = lastEvent.status.code;
           Logger.log("statusDescription");
           Logger.log(statusDescription);
           Logger.log("statusCode");
           Logger.log(statusCode);
+          sheet.getRange(i + 1, 5).setValue(statusDescription);
         }
 
-        sheet.getRange(i + 1, 5).setValue(statusDescription);
-        updateRowWhileOrderTracking(data[i], statusDescription);
+        updateRowWhileOrderTracking(data[i], statusDescription, trackingNumber);
+
         // sheet.getRange(i, 4).setValue(statusCode);
-      } else {
-        // sheet.getRange(i, 3).setValue('상품준비중');
-        sheet.getRange(i + 1, 5).setValue("출고대기");
       }
     } catch (e) {
       Logger.log("Error on row " + i + ": " + e.message);
@@ -146,36 +182,93 @@ function trackPackage() {
       sheet.getRange(i + 1, 5).setValue("출고대기");
     }
   }
+
+  Logger.log("end < lastRow");
+  Logger.log(end < lastRow);
+
+  if (end < lastRow) {
+    PropertiesService.getScriptProperties().setProperty(
+      "currentBatch",
+      currentBatch + 1
+    );
+    Logger.log("currentBatch");
+    Logger.log(currentBatch);
+    trackPackage(); // 다음 배치 처리
+  } else {
+    Logger.log("All batches processed");
+  }
 }
 
-function updateRowWhileOrderTracking(rowData, statusDescription) {
+function updateRowWhileOrderTracking(
+  rowData,
+  statusDescription,
+  trackingNumber
+) {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var sellerOrderSheet = ss.getSheetByName("셀러발주서정보");
   // 셀러발주서정보 시트에서 C열 아이디 가져오기
   // AB열의 코드 가져오기
   var code = rowData[27]; // AB열의 인덱스는 27 (0부터 시작)
 
-  var sellerData = sellerOrderSheet.getDataRange().getValues();
-  var sellerId = sellerData[parseInt(code)][2];
+  var sheetIds = sellerOrderSheet.getRange("C1:C").getValues().flat();
+  var sellerId = sheetIds[parseInt(code)];
+
+  Logger.log("updateRowWhileOrderTracking");
+  Logger.log(updateRowWhileOrderTracking);
+  Logger.log(rowData);
+  Logger.log(sellerId);
 
   if (sellerId) {
     // 아이디에 해당하는 스프레드시트 접근
     var sellerSpreadsheet = SpreadsheetApp.openById(sellerId);
     var cumulativeOrderSheet = sellerSpreadsheet.getSheetByName("누적발주");
+    var cumulativeOrderData = cumulativeOrderSheet.getDataRange().getValues();
 
     // "누적발주" 시트에서 동일한 B열 값을 찾기
-    var rowToUpdate = findRowByValue(cumulativeOrderSheet, 2, rowData[1]); // B열은 2번째 컬럼
+    var rowToUpdate = findRowByValueInBatchTrackPackage(
+      cumulativeOrderData,
+      rowData[1]
+    ); // B열은 2번째 컬럼
     if (rowToUpdate != -1) {
-      updateSheetStatus(
+      updateSheetStatusInBatchTrackPackage(
         cumulativeOrderSheet,
         rowToUpdate,
         5,
         statusDescription
       );
+      if (
+        !cumulativeOrderData[rowToUpdate][3] ||
+        cumulativeOrderData[rowToUpdate][3] == ""
+      ) {
+        updateSheetStatusInBatchTrackPackage(
+          cumulativeOrderSheet,
+          rowToUpdate,
+          4,
+          trackingNumber
+        );
+      }
       // var cumulativeData = cumulativeOrderSheet.getDataRange().getValues();
       // if (cumulativeData[rowToUpdate][4] == "출고대기") {
-      //   updateSheetStatus(cumulativeOrderSheet, rowToUpdate, 5, "statusDescription");
+      //   updateSheetStatusInBatchTrackPackage(cumulativeOrderSheet, rowToUpdate, 5, "statusDescription");
       // }
     }
   }
+}
+
+function updateSheetStatusInBatchTrackPackage(
+  sheet,
+  rowIndex,
+  columnIndex,
+  newValue
+) {
+  sheet.getRange(rowIndex + 1, columnIndex).setValue(newValue);
+}
+
+function findRowByValueInBatchTrackPackage(data, value) {
+  for (var i = 1; i < data.length; i++) {
+    if (data[i][1] == value) {
+      return i;
+    }
+  }
+  return -1;
 }
