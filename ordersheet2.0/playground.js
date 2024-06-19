@@ -166,3 +166,24 @@ if (depositObjectByOrderNumber.hasOwnProperty(1)) {
 //   console.log(keyValue);
 //   console.log(depositObjectByOrderNumber[keyValue]["key"]);
 // });
+
+var d = [
+  [1, 2, 3, 4, 5],
+  [1, 2, 3, 4, 5],
+];
+
+d.splice(3, 1, true);
+
+console.log(d);
+
+d.splice(5, 1, 6);
+
+console.log(d);
+
+d[1][3] = 10;
+console.log(d);
+
+console.log(null || false);
+
+var qi = [1, 2, 3, 4];
+console.log(qi.slice(0, 4));
