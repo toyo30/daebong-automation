@@ -19,3 +19,5 @@ rsa==4.9
 six==1.16.0  # 수정: @ 기호를 제거하고, 버전을 명시적으로 추가
 uritemplate==4.1.1
 urllib3==2.2.1
+asyncio
+tenacity
